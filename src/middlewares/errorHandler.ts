@@ -1,25 +1,18 @@
-import { logger } from '@utils/logger';
 import { Request, Response } from 'express';
 
-export class ApiError extends Error {
-  statusCode: number;
-
-  constructor(statusCode: number, message: string) {
-    super(message);
-    this.statusCode = statusCode;
-  }
+interface CustomError extends Error {
+  statusCode?: number;
 }
 
-export const errorHandler = (err: Error, req: Request, res: Response) => {
-  if (err instanceof ApiError) {
-    logger.error(`API Error: ${err.message}`);
-    return res.status(err.statusCode).json({
-      message: err.message,
-    });
-  }
+export const errorHandler = (err: CustomError, req: Request, res: Response) => {
+  console.error('Error:', err);
 
-  logger.error(`Unhandled Error: ${err.message}`);
-  return res.status(500).json({
-    message: 'Internal server error',
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Une erreur interne est survenue';
+
+  return res.status(statusCode).json({
+    success: false,
+    message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };

@@ -1,21 +1,28 @@
 import { swaggerOptions } from '@config/swagger';
 import { errorHandler } from '@middlewares/errorHandler';
-import userRoutes from '@routes/userRoutes';
 import { logger } from '@utils/logger';
 import compression from 'compression';
 import cors from 'cors';
 import { config } from 'dotenv';
-import express, { json, urlencoded } from 'express';
+import express, { urlencoded } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 import path from 'path';
 import swaggerJSDoc from 'swagger-jsdoc';
 import { serve, setup } from 'swagger-ui-express';
 
-const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+import albumRoutes from '@routes/albumRoutes';
+import artistRoutes from '@routes/artistRoutes';
+import mediaRoutes from '@routes/mediaRoutes';
+import playlistRoutes from '@routes/playlistRoutes';
+import trackRoutes from '@routes/trackRoutes';
+import userRoutes from '@routes/userRoutes';
+
+const envPath = path.resolve(process.cwd(), '.env');
 
 config({
-  path: path.resolve(process.cwd(), envFile),
+  path: envPath,
 });
 
 const app = express();
@@ -36,7 +43,7 @@ const corsOptions = {
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(compression());
-app.use(json());
+app.use(express.json());
 app.use(urlencoded({ extended: true }));
 
 const limiter = rateLimit({
@@ -54,8 +61,40 @@ if (!isProduction) {
 }
 
 app.use('/api/users', userRoutes);
+app.use('/api/artist', artistRoutes);
+app.use('/api/album', albumRoutes);
+app.use('/api/playlist', playlistRoutes);
+app.use('/api/track', trackRoutes);
+app.use('/api/media', mediaRoutes);
 
 app.use(errorHandler);
+
+const connectDB = async (): Promise<void> => {
+  try {
+    const mongoURI = process.env.MONGODB_URI;
+    if (!mongoURI) {
+      throw new Error("MONGODB_URI non défini dans les variables d'environnement");
+    }
+
+    await mongoose.connect(mongoURI);
+
+    logger.info('MongoDB connecté avec succès');
+  } catch (error) {
+    logger.error('Erreur de connexion MongoDB:', error);
+    process.exit(1);
+  }
+};
+
+// Gestion des événements de connexion
+mongoose.connection.on('disconnected', () => {
+  logger.warn('MongoDB déconnecté');
+});
+
+mongoose.connection.on('error', err => {
+  logger.error('Erreur MongoDB:', err);
+});
+
+connectDB();
 
 app.listen(PORT, () => {
   logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
